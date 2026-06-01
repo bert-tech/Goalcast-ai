@@ -3,28 +3,20 @@ export default async function handler(req, res) {
   if (!date) return res.status(400).json({ error: "Missing date" });
 
   const API_KEY = process.env.FOOTBALL_API_KEY;
-  const today = new Date().toISOString().split("T")[0];
 
   try {
-    let response = await fetch(
+    const response = await fetch(
       `https://api.football-data.org/v4/competitions/SA/matches?dateFrom=${date}&dateTo=${date}`,
       { headers: { "X-Auth-Token": API_KEY } }
     );
     if (!response.ok) throw new Error(`API error ${response.status}`);
-    let data = await response.json();
-    let matches = data.matches || [];
+    const data = await response.json();
+    const matches = data.matches || [];
 
-    if (matches.length === 0) {
-      let fbUrl = date > today
-        ? `https://api.football-data.org/v4/competitions/SA/matches?status=SCHEDULED,TIMED&dateFrom=${date}&dateTo=2025-12-31`
-        : `https://api.football-data.org/v4/competitions/SA/matches?status=FINISHED&dateFrom=2025-01-01&dateTo=${date}`;
-      const fb = await fetch(fbUrl, { headers: { "X-Auth-Token": API_KEY } });
-      const fbData = await fb.json();
-      const all = fbData.matches || [];
-      matches = date > today ? all.slice(0, 6) : all.slice(-6);
-    }
-
-    return res.status(200).json({ matches: formatMatches(matches), requestedDate: date });
+    return res.status(200).json({ 
+      matches: formatMatches(matches), 
+      requestedDate: date 
+    });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
