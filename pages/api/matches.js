@@ -1,22 +1,19 @@
 export default async function handler(req, res) {
-  const { date } = req.query;
+  const { date, competition } = req.query;
   if (!date) return res.status(400).json({ error: "Missing date" });
 
   const API_KEY = process.env.FOOTBALL_API_KEY;
+  const comp = competition || "PL";
 
   try {
     const response = await fetch(
-      `https://api.football-data.org/v4/competitions/SA/matches?dateFrom=${date}&dateTo=${date}`,
+      `https://api.football-data.org/v4/competitions/${comp}/matches?dateFrom=${date}&dateTo=${date}`,
       { headers: { "X-Auth-Token": API_KEY } }
     );
     if (!response.ok) throw new Error(`API error ${response.status}`);
     const data = await response.json();
     const matches = data.matches || [];
-
-    return res.status(200).json({ 
-      matches: formatMatches(matches), 
-      requestedDate: date 
-    });
+    return res.status(200).json({ matches: formatMatches(matches), requestedDate: date });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
