@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { formatTime, formatStage } from "../lib/flags";
+import { supabase } from "../lib/supabase";
 
 const COMPETITIONS = [
   { code: "PL",  label: "Premier League", crest: "https://crests.football-data.org/PL.png" },
@@ -43,6 +44,9 @@ function buildDays() {
 export default function Home() {
   const days = buildDays();
   const todayIndex = days.findIndex(d => d.isToday);
+
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(todayIndex);
   const [competition, setCompetition] = useState("PL");
   const [matches, setMatches] = useState([]);
@@ -56,6 +60,18 @@ export default function Home() {
   const [tab, setTab] = useState("matches");
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
     async function load() {
       setMatchLoading(true);
       setMatchError(null);
@@ -86,7 +102,7 @@ export default function Home() {
       setMatchLoading(false);
     }
     load();
-  }, [selectedDay, competition]);
+  }, [selectedDay, competition, user]);
 
   async function analyzeMatch(match, pick) {
     setAiLoading(true);
@@ -108,6 +124,11 @@ export default function Home() {
     setAiLoading(false);
   }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
+
   function selectMatch(m) {
     if (activeMatch?.id === m.id) {
       setActiveMatch(null);
@@ -122,6 +143,17 @@ export default function Home() {
   function submitPick(pick) {
     setUserPick(pick);
     analyzeMatch(activeMatch, pick);
+  }
+
+  if (authLoading) return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "#4a9e7a", fontFamily: "'Barlow Condensed', sans-serif" }}>
+      <span className="spin" style={{ fontSize: 30 }}>⚙️</span>
+    </div>
+  );
+
+  if (!user) {
+    if (typeof window !== "undefined") window.location.href = "/login";
+    return null;
   }
 
   return (
@@ -139,7 +171,13 @@ export default function Home() {
               <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: 1, lineHeight: 1 }}>GOALCAST AI</div>
               <div style={{ fontSize: 11, color: "#4a9e7a", letterSpacing: 2, textTransform: "uppercase" }}>Mondiali 2026</div>
             </div>
-            <div style={{ marginLeft: "auto", background: "#0d2a3a", border: "1px solid var(--green)", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: "var(--green-light)", fontWeight: 700 }}>🟢 LIVE</div>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ background: "#0d2a3a", border: "1px solid var(--green)", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: "var(--green-light)", fontWeight: 700 }}>🟢 LIVE</div>
+              <button onClick={handleLogout} style={{ background: "none", border: "1px solid #1a2a4a", borderRadius: 20, padding: "4px 12px", fontSize: 11, color: "var(--muted)", cursor: "pointer", fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700, letterSpacing: 1 }}>ESCI</button>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>
+            {user.email}
           </div>
           <nav style={{ display: "flex" }}>
             {["matches", "ranking", "pricing"].map(t => (
@@ -154,17 +192,15 @@ export default function Home() {
           {tab === "matches" && (
             <div className="animate-in">
 
-              {/* Competition selector */}
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                 {COMPETITIONS.map(c => (
-                  <button key={c.code} onClick={() => setCompetition(c.code)} style={{ flex: 1, padding: "10px 4px", background: competition === c.code ? "linear-gradient(135deg,var(--green),#0d7a54)" : "var(--bg3)", border: `1px solid ${competition === c.code ? "var(--green)" : "var(--border)"}`, borderRadius: 10, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, transition: "all .2s" }}>
-                    <img src={c.crest} alt={c.label} style={{ width: 24, height: 24, objectFit: "contain", filter: competition === c.code ? "none" : "grayscale(60%) opacity(0.6)" }} />
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: competition === c.code ? "#fff" : "var(--muted)" }}>{c.label}</span>
+                  <button key={c.code} onClick={() => setCompetition(c.code)} style={{ flex: 1, padding: "14px 4px", background: competition === c.code ? "linear-gradient(135deg,var(--green),#0d7a54)" : "linear-gradient(135deg,#0d1f3c,#0a1628)", border: `2px solid ${competition === c.code ? "var(--green)" : "#1e3050"}`, borderRadius: 12, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, transition: "all .2s", boxShadow: competition === c.code ? "0 0 20px rgba(26,158,110,.3)" : "none" }}>
+                    <img src={c.crest} alt={c.label} style={{ width: 36, height: 36, objectFit: "contain", filter: competition === c.code ? "none" : "grayscale(40%) opacity(0.75)", transition: "all .2s" }} />
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: competition === c.code ? "#fff" : "var(--muted2)", lineHeight: 1.2, textAlign: "center" }}>{c.label}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Day strip */}
               <div style={{ display: "flex", gap: 8, marginBottom: 18, overflowX: "auto", paddingBottom: 4 }}>
                 {days.map((d, i) => (
                   <button key={i} onClick={() => setSelectedDay(i)} style={{ minWidth: 52, background: selectedDay === i ? "linear-gradient(135deg,var(--green),#0d7a54)" : d.isPast ? "#080f1e" : "var(--bg3)", border: `1px solid ${selectedDay === i ? "var(--green)" : d.isPast ? "#0f1e36" : "var(--border)"}`, borderRadius: 10, padding: "8px 6px", cursor: "pointer", textAlign: "center", transition: "all .2s", color: "var(--text)", opacity: d.isPast && selectedDay !== i ? 0.6 : 1 }}>
